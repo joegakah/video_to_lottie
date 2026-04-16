@@ -1,4 +1,4 @@
-# video_to_dotlottie
+# video_to_lottie
 
 Convert any video file (MP4, MOV, AVI, …) into a **dotLottie** (`.lottie`) or plain **Lottie JSON** (`.json`) animation, with optional AI-powered background removal per frame.
 
@@ -22,8 +22,8 @@ Convert any video file (MP4, MOV, AVI, …) into a **dotLottie** (`.lottie`) or 
 ### 1. Clone or download the project
 
 ```bash
-git clone https://github.com/yourname/video_to_dotlottie.git
-cd video_to_dotlottie
+git clone https://github.com/yourname/video_to_lottie.git
+cd video_to_lottie
 ```
 
 ### 2. Create a virtual environment
@@ -61,7 +61,7 @@ pip install -r requirements.txt
 ### 4. Verify the install
 
 ```bash
-python video_to_dotlottie.py --inspect input.mp4
+python video_to_lottie.py --inspect input.mp4
 ```
 
 ---
@@ -71,7 +71,7 @@ python video_to_dotlottie.py --inspect input.mp4
 ### Interactive (recommended for first use)
 
 ```bash
-python video_to_dotlottie.py
+python video_to_lottie.py
 ```
 
 You'll be prompted for each option. The tool probes your video first and suggests sensible defaults for scale and fps. When asked for the output file name, **enter just the name without an extension** (e.g. `my_animation`) — the correct extension (`.lottie` or `.json`) is added automatically based on the format you choose next.
@@ -79,7 +79,7 @@ You'll be prompted for each option. The tool probes your video first and suggest
 ### Command line
 
 ```bash
-python video_to_dotlottie.py input.mp4 my_animation --fps 12 --scale 0.5
+python video_to_lottie.py input.mp4 my_animation --fps 12 --scale 0.5
 ```
 
 The output file is written to `output/my_animation.lottie` (or `.json` if `--format json`).
@@ -88,11 +88,11 @@ The output file is written to `output/my_animation.lottie` (or `.json` if `--for
 
 ## Output
 
-All converted files are saved to an **`output/`** folder created automatically next to `video_to_dotlottie.py`. You do not need to create it manually.
+All converted files are saved to an **`output/`** folder created automatically next to `video_to_lottie.py`. You do not need to create it manually.
 
 ```
-video_to_dotlottie/
-├── video_to_dotlottie.py
+video_to_lottie/
+├── video_to_lottie.py
 ├── requirements.txt
 ├── README.md
 └── output/
@@ -105,7 +105,7 @@ video_to_dotlottie/
 ## CLI Reference
 
 ```
-usage: video_to_dotlottie.py [input] [output] [options]
+usage: video_to_lottie.py [input] [output] [options]
 ```
 
 | Argument | Default | Description |
@@ -125,22 +125,22 @@ usage: video_to_dotlottie.py [input] [output] [options]
 
 **Inspect a video without converting:**
 ```bash
-python video_to_dotlottie.py myvideo.mp4 --inspect
+python video_to_lottie.py myvideo.mp4 --inspect
 ```
 
 **Convert at 24 fps, half resolution, no background removal:**
 ```bash
-python video_to_dotlottie.py myvideo.mp4 my_anim --fps 24 --scale 0.5 --no-rembg
+python video_to_lottie.py myvideo.mp4 my_anim --fps 24 --scale 0.5 --no-rembg
 ```
 
 **Export as plain Lottie JSON:**
 ```bash
-python video_to_dotlottie.py myvideo.mp4 my_anim --format json
+python video_to_lottie.py myvideo.mp4 my_anim --format json
 ```
 
 **Maximum compression for a small web asset:**
 ```bash
-python video_to_dotlottie.py myvideo.mp4 my_anim --fps 10 --scale 0.25 --webp-quality 65
+python video_to_lottie.py myvideo.mp4 my_anim --fps 10 --scale 0.25 --webp-quality 65
 ```
 
 ---

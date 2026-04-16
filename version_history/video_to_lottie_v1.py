@@ -209,42 +209,27 @@ def _source_frame_indices(source_fps: float, source_count: int,
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Step 1 - frame extraction
+# Step 1 – frame extraction
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _save_frame(raw_bgr, scale: float, out_w: int, out_h: int,
-                proc_path: str, remove_bg: bool,
-                webp_quality: int = 80) -> tuple[int, int]:
-    """
-    Resize, optionally remove background, and save as WebP with alpha.
-
-    WebP gives ~25-40% smaller files than PNG for photographic content
-    while preserving full RGBA transparency.  quality=80 is a good
-    default; raise to 90-95 for near-lossless, lower to 60-70 for
-    maximum compression at the cost of some fine detail.
-    """
+                proc_path: str, remove_bg: bool) -> tuple[int, int]:
+    """Resize, optionally remove bg, save as RGBA PNG. Returns (width, height)."""
     if scale != 1.0:
         raw_bgr = cv2.resize(raw_bgr, (out_w, out_h), interpolation=cv2.INTER_AREA)
     rgb = cv2.cvtColor(raw_bgr, cv2.COLOR_BGR2RGB)
     img = PILImage.fromarray(rgb)
     processed = rembg_remove(img) if remove_bg else img.convert("RGBA")
-    processed.save(
-        proc_path, "WEBP",
-        quality=webp_quality,
-        method=6,        # slowest/best encoder effort (0-6)
-        lossless=False,  # lossy RGB + lossless alpha
-        exact=True,      # preserve transparent pixels exactly
-    )
+    processed.save(proc_path, "PNG")
     return processed.size
 
 
 def extract_frames(
-    video_path    : str,
-    temp_folder   : str,
-    target_fps    : float = 12.0,
-    scale         : float = 1.0,
-    remove_bg     : bool  = True,
-    webp_quality  : int   = 80,
+    video_path  : str,
+    temp_folder : str,
+    target_fps  : float = 12.0,
+    scale       : float = 1.0,
+    remove_bg   : bool  = True,
 ) -> tuple[list[FrameInfo], float]:
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -298,27 +283,25 @@ def extract_frames(
                 f"The video may be shorter than expected."
             )
 
-        proc_path       = os.path.join(proc_dir, f"frame_{out_idx:0{pad}d}.webp")
-        actual_w, actual_h = _save_frame(raw, scale, out_w, out_h, proc_path, remove_bg, webp_quality)
+        proc_path       = os.path.join(proc_dir, f"frame_{out_idx:0{pad}d}.png")
+        actual_w, actual_h = _save_frame(raw, scale, out_w, out_h, proc_path, remove_bg)
         frame_infos.append(FrameInfo(proc_path, actual_w, actual_h))
         _progress(out_idx + 1, n_out, prefix="frames")
 
     print()
-    print(f"      Done - {n_out} frame(s) in {time.monotonic() - t0:.1f}s")
+    print(f"      Done – {n_out} frame(s) in {time.monotonic() - t0:.1f}s")
     return frame_infos, target_fps
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Step 2 - build the Lottie JSON structure
+# Step 2 – build the Lottie JSON structure
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _img_to_data_uri(path: str) -> str:
-    """Read an image file and return an appropriate data URI (WebP or PNG)."""
-    ext = os.path.splitext(path)[1].lower()
-    mime = "image/webp" if ext == ".webp" else "image/png"
+def _png_to_data_uri(path: str) -> str:
+    """Read a PNG and return a data:image/png;base64,... URI string."""
     with open(path, "rb") as fh:
         b64 = base64.b64encode(fh.read()).decode("ascii")
-    return f"data:{mime};base64,{b64}"
+    return f"data:image/png;base64,{b64}"
 
 
 def build_lottie_json(
@@ -354,7 +337,7 @@ def build_lottie_json(
             "w"   : fi.width,
             "h"   : fi.height,
             "u"   : "",                       # no file path; data inline
-            "p"   : _img_to_data_uri(fi.path),
+            "p"   : _png_to_data_uri(fi.path),
             "e"   : 1,                        # 1 = embedded (data URI)
         })
 
@@ -417,7 +400,7 @@ def _identity_transform(width: int, height: int) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Step 3 - package / export
+# Step 3 – package / export
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def export_as_dotlottie(lottie_json: dict, temp_folder: str,
@@ -471,7 +454,6 @@ def video_to_dotlottie(
     remove_bg       : bool  = True,
     keep_temp       : bool  = False,
     output_format   : str   = "lottie",   # "lottie" | "json"
-    webp_quality    : int   = 80,          # 0-100; 80 is a good default
 ) -> None:
     """
     Full pipeline: video → frames → (bg removal) → Lottie JSON → .lottie / .json
@@ -491,11 +473,6 @@ def video_to_dotlottie(
 
     inspect_video(video_path)   # print info table; raises early if file is bad
 
-    # Always write finished files into an output/ folder next to the script
-    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
-    os.makedirs(output_dir, exist_ok=True)
-    output_filename = os.path.join(output_dir, os.path.basename(output_filename))
-
     if os.path.exists(temp_folder):
         shutil.rmtree(temp_folder)
     os.makedirs(temp_folder)
@@ -507,7 +484,6 @@ def video_to_dotlottie(
             target_fps=target_fps,
             scale=scale,
             remove_bg=remove_bg,
-            webp_quality=webp_quality,
         )
 
         lottie_json = build_lottie_json(frames, fps)
@@ -542,8 +518,8 @@ def _cli() -> None:
     )
     p.add_argument("input",  nargs="?", default="input.mp4",
                    help="Input video path")
-    p.add_argument("output", nargs="?", default="my_animation",
-                   help="Output file name (extension added automatically from --format)")
+    p.add_argument("output", nargs="?", default="my_animation.lottie",
+                   help="Output file (.lottie or .json)")
     p.add_argument("--fps",       type=float, default=12.0,
                    help="Output animation frame rate (fps)")
     p.add_argument("--scale",     type=float, default=1.0,
@@ -556,8 +532,6 @@ def _cli() -> None:
                    help="Temporary folder name")
     p.add_argument("--format",    choices=["lottie", "json"], default="lottie",
                    help="Output format: zipped dotLottie or plain JSON")
-    p.add_argument("--webp-quality", type=int, default=80,
-                   help="WebP encode quality 0-100 (default 80)")
     p.add_argument("--inspect",   action="store_true",
                    help="Print video info and exit without converting")
     args = p.parse_args()
@@ -566,21 +540,15 @@ def _cli() -> None:
         inspect_video(args.input)
         return
 
-    # Strip any extension the user may have supplied on the output name,
-    # then re-attach the correct one based on --format.
-    output_stem = os.path.splitext(args.output)[0]
-    output_name = output_stem + (".json" if args.format == "json" else ".lottie")
-
     video_to_dotlottie(
         video_path      = args.input,
-        output_filename = output_name,
+        output_filename = args.output,
         temp_folder     = args.temp_dir,
         target_fps      = args.fps,
         scale           = args.scale,
         remove_bg       = not args.no_rembg,
         keep_temp       = args.keep_temp,
         output_format   = args.format,
-        webp_quality    = args.webp_quality,
     )
 
 
@@ -604,14 +572,16 @@ def run_interactive() -> None:
         print(f"❌  {exc}")
         return
 
-    # ── output name (bare — no extension) ───────────────────────────────────────
-    out_raw  = input("\n💾  Output file name (no extension) [animation]: ").strip()
-    out_stem = os.path.splitext(out_raw)[0] if out_raw else "animation"
+    # ── output file ───────────────────────────────────────────────────────────
+    out = input("\n💾  Output filename [animation.json/animation.lottie]: ").strip()
+    if not out:
+        out = "animation.lottie"
+    if not (out.endswith(".lottie") or out.endswith(".json")):
+        out += ".lottie"
 
     # ── output format ─────────────────────────────────────────────────────────
-    fmt_raw = input("📦  Output format — (1) dotLottie .lottie  (2) plain .json  [1]: ").strip()
+    fmt_raw = input("📦  Output format — (1) dotLottie zip  (2) plain JSON  [1]: ").strip()
     fmt     = "json" if fmt_raw == "2" else "lottie"
-    out     = out_stem + (".json" if fmt == "json" else ".lottie")
 
     # ── target fps  (default = min(source_fps, 24)) ───────────────────────────
     default_fps = min(info.fps, 24.0)
@@ -627,7 +597,7 @@ def run_interactive() -> None:
     # ── scale  (default = suggested scale from resolution) ────────────────────
     default_scale = info.suggested_scale
     scl_raw = input(
-        f"🔍  Scale factor 0.1-1.0  "
+        f"🔍  Scale factor 0.1–1.0  "
         f"(suggested {default_scale} for {info.quality_label}) [{default_scale}]: "
     ).strip()
     try:
@@ -641,15 +611,6 @@ def run_interactive() -> None:
     bg_raw    = input("✂  Remove background? (y/n) [y]: ").strip().lower()
     remove_bg = bg_raw != "n"
 
-    # ── webp quality ──────────────────────────────────────────────────────────
-    wq_raw = input("🖼  WebP quality 0-100 (80=good, 90=near-lossless) [80]: ").strip()
-    try:
-        webp_quality = int(wq_raw) if wq_raw else 80
-        webp_quality = max(0, min(webp_quality, 100))
-    except ValueError:
-        print("⚠  Invalid quality; using 80.")
-        webp_quality = 80
-
     # ── run ───────────────────────────────────────────────────────────────────
     video_to_dotlottie(
         video_path      = raw,
@@ -658,7 +619,6 @@ def run_interactive() -> None:
         scale           = scale,
         remove_bg       = remove_bg,
         output_format   = fmt,
-        webp_quality    = webp_quality,
         keep_temp       = False,
     )
 
