@@ -491,6 +491,11 @@ def video_to_dotlottie(
 
     inspect_video(video_path)   # print info table; raises early if file is bad
 
+    # Always write finished files into an output/ folder next to the script
+    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
+    os.makedirs(output_dir, exist_ok=True)
+    output_filename = os.path.join(output_dir, os.path.basename(output_filename))
+
     if os.path.exists(temp_folder):
         shutil.rmtree(temp_folder)
     os.makedirs(temp_folder)
@@ -537,8 +542,8 @@ def _cli() -> None:
     )
     p.add_argument("input",  nargs="?", default="input.mp4",
                    help="Input video path")
-    p.add_argument("output", nargs="?", default="my_animation.lottie",
-                   help="Output file (.lottie or .json)")
+    p.add_argument("output", nargs="?", default="my_animation",
+                   help="Output file name (extension added automatically from --format)")
     p.add_argument("--fps",       type=float, default=12.0,
                    help="Output animation frame rate (fps)")
     p.add_argument("--scale",     type=float, default=1.0,
@@ -561,9 +566,14 @@ def _cli() -> None:
         inspect_video(args.input)
         return
 
+    # Strip any extension the user may have supplied on the output name,
+    # then re-attach the correct one based on --format.
+    output_stem = os.path.splitext(args.output)[0]
+    output_name = output_stem + (".json" if args.format == "json" else ".lottie")
+
     video_to_dotlottie(
         video_path      = args.input,
-        output_filename = args.output,
+        output_filename = output_name,
         temp_folder     = args.temp_dir,
         target_fps      = args.fps,
         scale           = args.scale,
@@ -594,16 +604,14 @@ def run_interactive() -> None:
         print(f"❌  {exc}")
         return
 
-    # ── output file ───────────────────────────────────────────────────────────
-    out = input("\n💾  Output filename [animation.lottie]: ").strip()
-    if not out:
-        out = "animation.lottie"
-    if not (out.endswith(".lottie") or out.endswith(".json")):
-        out += ".lottie"
+    # ── output name (bare — no extension) ───────────────────────────────────────
+    out_raw  = input("\n💾  Output file name (no extension) [animation]: ").strip()
+    out_stem = os.path.splitext(out_raw)[0] if out_raw else "animation"
 
     # ── output format ─────────────────────────────────────────────────────────
-    fmt_raw = input("📦  Output format — (1) dotLottie zip  (2) plain JSON  [1]: ").strip()
+    fmt_raw = input("📦  Output format — (1) dotLottie .lottie  (2) plain .json  [1]: ").strip()
     fmt     = "json" if fmt_raw == "2" else "lottie"
+    out     = out_stem + (".json" if fmt == "json" else ".lottie")
 
     # ── target fps  (default = min(source_fps, 24)) ───────────────────────────
     default_fps = min(info.fps, 24.0)
@@ -633,6 +641,15 @@ def run_interactive() -> None:
     bg_raw    = input("✂  Remove background? (y/n) [y]: ").strip().lower()
     remove_bg = bg_raw != "n"
 
+    # ── webp quality ──────────────────────────────────────────────────────────
+    wq_raw = input("🖼  WebP quality 0-100 (80=good, 90=near-lossless) [80]: ").strip()
+    try:
+        webp_quality = int(wq_raw) if wq_raw else 80
+        webp_quality = max(0, min(webp_quality, 100))
+    except ValueError:
+        print("⚠  Invalid quality; using 80.")
+        webp_quality = 80
+
     # ── run ───────────────────────────────────────────────────────────────────
     video_to_dotlottie(
         video_path      = raw,
@@ -641,6 +658,7 @@ def run_interactive() -> None:
         scale           = scale,
         remove_bg       = remove_bg,
         output_format   = fmt,
+        webp_quality    = webp_quality,
         keep_temp       = False,
     )
 
